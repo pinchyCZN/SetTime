@@ -418,17 +418,9 @@ int main(int argc,char *argv[])
 		get_time_daytime_protocol(timeserver,port,update);
 
 
-	printf("exiting ");
-	for(i=0;i<6;i++)
-	{
-		printf(".");
-		key=getkey2();
-		if(key>1)
-			i=0;
-		if(key==0x1b)
-			exit(0);
-		Sleep(700);
+	if(getenv("PROMPT")==0){
+		printf("press any key to exit\n");
+		getkey();
 	}
-
 
 }
