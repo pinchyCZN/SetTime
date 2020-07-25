@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <conio.h>
+#include <ctype.h>
 
 
 int getkey()
@@ -151,6 +153,23 @@ int convert_ntp_to_systime(LARGE_INTEGER *ntp,SYSTEMTIME *systime)
 	return TRUE;
 
 }
+int convert_hostname(const char *server,struct sockaddr_in *peer)
+{
+	int result=TRUE;
+	if(isdigit(server[0]))
+		peer->sin_addr.s_addr = inet_addr(server);
+	else{
+		struct hostent *h;
+		h=gethostbyname(server);
+		if(h){
+			memcpy(&peer->sin_addr,h->h_addr_list[0],h->h_length);
+		}else{
+			printf("gethostbyname failed for %s\n",server);
+			result=FALSE;
+		}
+	}
+	return result;
+}
 int get_time_ntp(char *timeserver,int port,int update)
 {
 	WSADATA ws;
@@ -178,9 +197,7 @@ int get_time_ntp(char *timeserver,int port,int update)
 
 	peer.sin_family = AF_INET;
 	peer.sin_port = htons((u_short)port);
-	peer.sin_addr.s_addr = inet_addr(timeserver);
-
-
+	convert_hostname(timeserver,&peer);
 
 
 	tcp_socket = socket(AF_INET, SOCK_DGRAM, 0);
@@ -250,7 +267,7 @@ int get_time_daytime_protocol(char *timeserver,int port,int update)
 
 	peer.sin_family = AF_INET;
 	peer.sin_port = htons((u_short)port);
-	peer.sin_addr.s_addr = inet_addr(timeserver);
+	convert_hostname(timeserver,&peer);
 
 	tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
 	printf("connecting to %s port:%i\n",timeserver,port);
@@ -323,21 +340,23 @@ int list_and_get_servers(char *server,int *port,int *use_ntp)
 	char str[80];
 	int selection=0;
 	int i;
-	typedef struct {char *name;char *descrip;int port;int ntp;} _servlist;
+	typedef struct {char *name;int port;int ntp;} _servlist;
 	static _servlist servlist[]={
-		{"132.163.4.101","time-b.timefreq.bldrdoc.gov",13,FALSE},
-		{"132.163.4.102","time-b.timefreq.bldrdoc.gov",13,FALSE},
-		{"132.163.4.103","time-b.timefreq.bldrdoc.gov",13,FALSE},
-		{"70.84.194.243","some yackity schmack place ",1313,FALSE},
+		{"time-a-wwv.nist.gov",123,TRUE},
+		{"time-a-g.nist.gov",123,TRUE},
+		{"time-a-b.nist.gov",123,TRUE},
+		{"atomictime.net",1313,FALSE},
 	};
+	int count=sizeof(servlist)/sizeof(servlist[0]);
 	printf("\n\nselect time server\n");
-	for(i=0;i<sizeof(servlist)/sizeof(_servlist);i++)
+	printf("   %-24s %4s %s\n","server","port","NTP");
+	for(i=0;i<count;i++)
 	{
-		printf("%i:%s :%s %i %s\n",i+1,servlist[i].descrip,servlist[i].name,servlist[i].port,servlist[i].ntp?"NTP":"");
+		printf("%i: %-24s %-4i %-s\n",i+1,servlist[i].name,servlist[i].port,servlist[i].ntp?"NTP":"");
 	}
 	gets(str);
 	sscanf(str,"%d",&selection);
-	if( (selection<=0) || (selection>(sizeof(servlist)/sizeof(_servlist))) )
+	if( (selection<=0) || (selection>count) )
 		selection=1; 
 	selection-=1;
 	strcpy(server,servlist[selection].name);
@@ -354,9 +373,8 @@ int main(int argc,char *argv[])
 {
 
 	int i;
-	char timeserver[255];
+	char timeserver[255]={0};
 	int port;
-	int key;
 	int use_ntp=FALSE;
 	int update=TRUE;
 
@@ -387,9 +405,9 @@ int main(int argc,char *argv[])
 			}
 			else if(strstr(argv[i],"-ntp")!=0)
 			{
-				if(i==1)
+				if(0==timeserver[0])
 				{
-					strcpy(timeserver,"172.16.10.1");
+					strcpy(timeserver,"time-a-wwv.nist.gov");
 					port=123;
 				}
 				use_ntp=TRUE;
@@ -404,12 +422,14 @@ int main(int argc,char *argv[])
 	}
 	else
 	{
-		strcpy(timeserver,"70.84.194.243");  
+		strcpy(timeserver,"atomictime.net");  
 		port=1313;
 	}
 	printf("using server [%s] port [%i]\n",timeserver,port);
 	if(use_ntp)
 		printf("using NTP protocol\n");
+	if(FALSE==update)
+		printf("NOT CHANGING CLOCK\n");
 	
 
 	if(use_ntp)
