@@ -422,8 +422,9 @@ int main(int argc,char *argv[])
 	}
 	else
 	{
-		strcpy(timeserver,"atomictime.net");  
-		port=1313;
+		strcpy(timeserver,"time-a-wwv.nist.gov");
+		port=123;
+		use_ntp=TRUE;
 	}
 	printf("using server [%s] port [%i]\n",timeserver,port);
 	if(use_ntp)
